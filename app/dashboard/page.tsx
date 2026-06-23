@@ -1,117 +1,222 @@
-'use client';
+"use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { dashboardMetrics, groupNames, DashboardMetric } from "./data";
+
 import DashboardCard from "@/components/DashboardCard";
-import AdminManagementModal from "@/components/AdminManagementModal";
+
+import { useDashboard } from "@/hooks/useDashboard";
+
+import ProductModal from "@/modals/ProductModal";
+import OrderModal from "@/modals/OrderModal";
+import ShipmentModal from "@/modals/ShipmentModal";
+import DisputeModal from "@/modals/DisputeModal";
+
+type DashboardSection =
+  | "products"
+  | "orders"
+  | "shipments"
+  | "transactions"
+  | "disputes"
+  | null;
 
 export default function DashboardPage() {
-    const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const { dashboard, loading, error, refresh, lastUpdated } = useDashboard();
 
-    // Guardamos los conteos dinámicos para que se actualicen en tiempo real al agregar/eliminar items en el modal ABM
-    const [counts, setCounts] = useState<Record<string, number>>(() =>
-        dashboardMetrics.reduce((acc, m) => {
-            acc[m.id] = m.count;
-            return acc;
-        }, {} as Record<string, number>)
-    );
+  const [activeSection, setActiveSection] = useState<DashboardSection>(null);
 
-    // Agrupamiento dinámico de métricas utilizando los contadores locales actualizados
-    const groupedMetrics = Object.keys(groupNames).reduce((acc, key) => {
-        acc[key] = dashboardMetrics.filter((m) => m.group === key);
-        return acc;
-    }, {} as Record<string, DashboardMetric[]>);
-
-    // Computaciones de encabezados de resumen rápidos
-    const totalUsers = counts['usuarios'] ?? 0;
-    const activeDisputes = counts['disputas'] ?? 0;
-    const activeShipments = counts['envios'] ?? 0;
-
-    // Obtener nombre del elemento activo
-    const activeMetric = dashboardMetrics.find(m => m.id === selectedSectionId);
-    const sectionName = activeMetric ? activeMetric.name : "";
-
+  if (loading) {
     return (
-        <div className="flex-1 w-full max-w-7xl mx-auto px-4 py-8 md:px-8">
-            {/* Breadcrumbs & Live Pulse status */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                <nav className="flex items-center gap-2 text-xs font-medium text-brand-forest/60">
-                    <Link href="/" className="hover:text-brand-sage transition-colors flex items-center gap-1">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-                        </svg>
-                        Inicio
-                    </Link>
-                    <span>/</span>
-                    <span className="text-brand-forest/80 font-semibold">Panel de Administración</span>
-                </nav>
-            </div>
-
-            {/* Main Header Title Section */}
-            <div className="mb-10">
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-brand-forest font-sans">
-                    Consola de Control Central
-                </h1>
-                <p className="mt-2 text-sm text-brand-forest/70 max-w-3xl leading-relaxed font-light">
-                    Supervise métricas críticas de la base de datos, administre cuentas de la comunidad, rastree despachos y resuelva reclamos de intercambio. Seleccione cualquier módulo para acceder a las operaciones detalladas.
-                </p>
-            </div>
-
-            {/* Grid Groups Section */}
-            <div className="space-y-12">
-                {Object.entries(groupNames).map(([groupKey, groupInfo]) => {
-                    const metrics = groupedMetrics[groupKey] || [];
-                    if (metrics.length === 0) return null;
-
-                    return (
-                        <section key={groupKey} className="space-y-4">
-                            {/* Group Title and Info */}
-                            <div className="border-b border-brand-sand/60 pb-2">
-                                <h2 className="text-lg font-bold text-brand-forest font-sans flex items-center gap-2">
-                                    {groupInfo.title}
-                                </h2>
-                                <p className="text-xs text-brand-forest/60 font-light mt-0.5">
-                                    {groupInfo.description}
-                                </p>
-                            </div>
-
-                            {/* Items Cards Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {metrics.map((item) => {
-                                    // Enviamos la métrica con el contador actualizado dinámicamente
-                                    const updatedItem = {
-                                        ...item,
-                                        count: counts[item.id] ?? item.count
-                                    };
-                                    return (
-                                        <DashboardCard
-                                            key={item.id}
-                                            item={updatedItem}
-                                            onClick={(id) => setSelectedSectionId(id)}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </section>
-                    );
-                })}
-            </div>
-
-            {/* Ventana modal de gestión ABM superpuesta */}
-            {selectedSectionId && (
-                <AdminManagementModal
-                    sectionId={selectedSectionId}
-                    sectionName={sectionName}
-                    onClose={() => setSelectedSectionId(null)}
-                    onUpdateCount={(id, newCount) => {
-                        setCounts((prev) => ({
-                            ...prev,
-                            [id]: newCount,
-                        }));
-                    }}
-                />
-            )}
-        </div>
+      <div className="p-8">
+        <h1 className="text-2xl font-bold">Cargando dashboard...</h1>
+      </div>
     );
+  }
+
+  if (error || !dashboard) {
+    return (
+      <div className="p-8 space-y-4">
+        <h1 className="text-2xl font-bold text-red-600">Error</h1>
+
+        <p>{error}</p>
+
+        <button
+          onClick={refresh}
+          className="px-4 py-2 bg-black text-white rounded"
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
+  const metrics = dashboard.metrics;
+
+  return (
+    <>
+      <div className="max-w-7xl mx-auto p-8 space-y-8">
+        {/* Header */}
+
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-4xl font-bold">Control Plane</h1>
+
+            <p className="text-gray-500 mt-2">Administración centralizada</p>
+          </div>
+
+          <div className="text-right">
+            <button
+              onClick={refresh}
+              className="
+                                px-4
+                                py-2
+                                rounded-lg
+                                bg-black
+                                text-white
+                            "
+            >
+              Actualizar
+            </button>
+
+            {lastUpdated && (
+              <p className="text-xs text-gray-500 mt-2">
+                Última actualización: {lastUpdated.toLocaleTimeString()}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* KPIs */}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          <DashboardCard
+            title="Productos"
+            value={metrics.products}
+            description="Catálogo total"
+            onClick={() => setActiveSection("products")}
+          />
+
+          <DashboardCard
+            title="Productos Activos"
+            value={metrics.activeProducts}
+          />
+
+          <DashboardCard title="Sin Stock" value={metrics.outOfStock} />
+
+          <DashboardCard
+            title="Órdenes"
+            value={metrics.orders}
+            description="Órdenes registradas"
+            onClick={() => setActiveSection("orders")}
+          />
+
+          <DashboardCard
+            title="Envíos"
+            value={metrics.shipments}
+            description="Total de envíos"
+            onClick={() => setActiveSection("shipments")}
+          />
+
+          <DashboardCard title="Pendientes" value={metrics.pendingShipments} />
+
+          <DashboardCard
+            title="Transacciones"
+            value={metrics.transactions}
+            onClick={() => setActiveSection("transactions")}
+          />
+
+          <DashboardCard
+            title="Disputas"
+            value={metrics.disputes}
+            onClick={() => setActiveSection("disputes")}
+          />
+
+          <DashboardCard
+            title="Disputas Abiertas"
+            value={metrics.openDisputes}
+          />
+
+          <DashboardCard title="Revenue" value={`$${metrics.totalRevenue}`} />
+        </div>
+
+        {/* Resumen rápido */}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl border p-6">
+            <h2 className="font-semibold mb-4">Últimos envíos</h2>
+
+            <div className="space-y-3">
+              {dashboard.shipments.slice(0, 5).map((shipment) => (
+                <div
+                  key={shipment.id}
+                  className="
+                                            flex
+                                            justify-between
+                                            border-b
+                                            pb-2
+                                        "
+                >
+                  <span>{shipment.orderId}</span>
+
+                  <span>{shipment.currentStatus}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border p-6">
+            <h2 className="font-semibold mb-4">Últimas disputas</h2>
+
+            <div className="space-y-3">
+              {dashboard.disputes.slice(0, 5).map((dispute) => (
+                <div
+                  key={dispute.id}
+                  className="
+                                            flex
+                                            justify-between
+                                            border-b
+                                            pb-2
+                                        "
+                >
+                  <span>{dispute.reason}</span>
+
+                  <span>{dispute.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* MODALES */}
+
+      {activeSection === "products" && (
+        <ProductModal
+          products={dashboard.products}
+          onClose={() => setActiveSection(null)}
+        />
+      )}
+
+      {activeSection === "orders" && (
+        <OrderModal
+          orders={dashboard.orders}
+          onClose={() => setActiveSection(null)}
+        />
+      )}
+
+      {activeSection === "shipments" && (
+        <ShipmentModal
+          shipments={dashboard.shipments}
+          onClose={() => setActiveSection(null)}
+          onRefresh={refresh}
+        />
+      )}
+
+      {activeSection === "disputes" && (
+        <DisputeModal
+          disputes={dashboard.disputes}
+          onClose={() => setActiveSection(null)}
+        />
+      )}
+    </>
+  );
 }
