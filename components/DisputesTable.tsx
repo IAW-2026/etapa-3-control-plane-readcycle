@@ -33,7 +33,7 @@ export default function DisputesTable({
         </thead>
 
         <tbody>
-          {disputes.map((dispute) => (
+          {disputes?.map((dispute) => (
             <tr key={dispute.id} className="border-b">
               <td className="p-3">{dispute.id}</td>
 

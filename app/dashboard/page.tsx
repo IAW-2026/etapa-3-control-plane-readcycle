@@ -146,7 +146,7 @@ export default function DashboardPage() {
             <h2 className="font-semibold mb-4">Últimos envíos</h2>
 
             <div className="space-y-3">
-              {dashboard.shipments.slice(0, 5).map((shipment) => (
+              {dashboard.shipments?.slice(0, 5).map((shipment) => (
                 <div
                   key={shipment.id}
                   className="
@@ -156,9 +156,9 @@ export default function DashboardPage() {
                                             pb-2
                                         "
                 >
-                  <span>{shipment.orderId}</span>
+                  <span>{shipment?.orderId}</span>
 
-                  <span>{shipment.currentStatus}</span>
+                  <span>{shipment?.currentStatus}</span>
                 </div>
               ))}
             </div>
@@ -168,7 +168,7 @@ export default function DashboardPage() {
             <h2 className="font-semibold mb-4">Últimas disputas</h2>
 
             <div className="space-y-3">
-              {dashboard.disputes.slice(0, 5).map((dispute) => (
+              {dashboard?.disputes?.slice(0, 5).map((dispute) => (
                 <div
                   key={dispute.id}
                   className="
@@ -178,9 +178,9 @@ export default function DashboardPage() {
                                             pb-2
                                         "
                 >
-                  <span>{dispute.reason}</span>
+                  <span>{dispute?.reason}</span>
 
-                  <span>{dispute.status}</span>
+                  <span>{dispute?.status}</span>
                 </div>
               ))}
             </div>

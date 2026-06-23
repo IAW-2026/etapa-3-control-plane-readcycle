@@ -2,9 +2,14 @@ import { paymentsApi } from "./api";
 
 class PaymentsService {
   async getTransactions(page = 1) {
-    const { data } = await paymentsApi.get(`/payments/transactions`);
+    try {
+      const { data } = await paymentsApi.get(`/payments/transactions`);
 
-    return data;
+      return data;
+    } catch (error) {
+      console.log(error);
+      return [];
+    }
   }
 
   async getDisputes(page = 1) {

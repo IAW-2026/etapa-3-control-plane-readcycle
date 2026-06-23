@@ -31,33 +31,33 @@ class DashboardService {
         disputes,
 
         metrics: {
-          products: products.length,
+          products: products?.length,
 
-          activeProducts: products.filter((p) => p.isActive).length,
+          activeProducts: products?.filter((p) => p.isActive).length,
 
-          outOfStock: products.filter((p) => p.stock === 0).length,
+          outOfStock: products?.filter((p) => p.stock === 0).length,
 
-          orders: orders.length,
+          orders: orders?.length,
 
-          shipments: shipments.length,
+          shipments: shipments?.length,
 
-          pendingShipments: shipments.filter(
+          pendingShipments: shipments?.filter(
             (s) => s.currentStatus === "PENDING",
           ).length,
 
-          transactions: transactions.length,
+          transactions: transactions?.length,
 
-          approvedTransactions: transactions.filter(
+          approvedTransactions: transactions?.filter(
             (t) => t.status === "APPROVED",
           ).length,
 
-          disputes: disputes.length,
+          disputes: disputes?.length,
 
-          openDisputes: disputes.filter((d) => d.status !== "RESOLVED").length,
+          openDisputes: disputes?.filter((d) => d.status !== "RESOLVED").length,
 
           totalRevenue: transactions
-            .filter((t) => t.status === "APPROVED")
-            .reduce((sum, t) => sum + t.amount, 0),
+            ?.filter((t) => t.status === "APPROVED")
+            ?.reduce((sum, t) => sum + t.amount, 0),
         },
       };
     } catch (error) {

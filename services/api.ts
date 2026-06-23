@@ -14,8 +14,6 @@ export const sellerApi = axios.create({
   },
 });
 
-console.log(sellerApi);
-
 export const paymentsApi = axios.create({
   baseURL: process.env.NEXT_PUBLIC_PAYMENTS_API_URL,
   headers: {

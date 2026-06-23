@@ -33,7 +33,7 @@ export default function TransactionsTable({
         </thead>
 
         <tbody>
-          {transactions.map((tx) => (
+          {transactions?.map((tx) => (
             <tr key={tx.id} className="border-b">
               <td className="p-3">{tx.id}</td>
 

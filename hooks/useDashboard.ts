@@ -7,6 +7,7 @@ interface UseDashboardReturn {
   dashboard: DashboardData | null;
   loading: boolean;
   error: string | null;
+  lastUpdated: Date | null;
 
   refresh: () => Promise<void>;
 }
@@ -31,24 +32,21 @@ export function useDashboard(): UseDashboardReturn {
 
       setError("No se pudo cargar la información del dashboard");
     } finally {
+      setLastUpdated(new Date());
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     loadDashboard();
-
-    const interval = setInterval(loadDashboard, 30000);
-
     setLastUpdated(new Date());
-
-    return () => clearInterval(interval);
   }, [loadDashboard]);
 
   return {
     dashboard,
     loading,
     error,
+    lastUpdated,
     refresh: loadDashboard,
   };
 }
