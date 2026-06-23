@@ -2,17 +2,20 @@ import { paymentsApi } from "./api";
 
 class PaymentsService {
   async getTransactions(page = 1) {
-    const { data } = await paymentsApi.get(
-      `/payments/transactions?page=${page}`,
-    );
+    const { data } = await paymentsApi.get(`/payments/transactions`);
 
     return data;
   }
 
   async getDisputes(page = 1) {
-    const { data } = await paymentsApi.get(`/payments/disputes?page=${page}`);
+    try {
+      const { data } = await paymentsApi.get(`/payments/disputes`);
 
-    return data;
+      return data;
+    } catch (error) {
+      console.log(error.message);
+      return [];
+    }
   }
 }
 

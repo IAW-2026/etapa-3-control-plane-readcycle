@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 
-import DashboardCard from "@/components/DashboardCard";
+import DashboardCard from "@/components/DashboardCard2";
 
 import { useDashboard } from "@/hooks/useDashboard";
 
-import ProductModal from "@/modals/ProductModal";
-import OrderModal from "@/modals/OrderModal";
-import ShipmentModal from "@/modals/ShipmentModal";
-import DisputeModal from "@/modals/DisputeModal";
+import ProductModal from "@/components/modals/ProductModal";
+import OrderModal from "@/components/modals/OrderModal";
+import ShipmentModal from "@/components/modals/ShipmentModal";
+import DisputeModal from "@/components/modals/DisputeModal";
+import TransactionModal from "@/components/modals/TransactionModal";
 
 type DashboardSection =
   | "products"
@@ -214,6 +215,13 @@ export default function DashboardPage() {
       {activeSection === "disputes" && (
         <DisputeModal
           disputes={dashboard.disputes}
+          onClose={() => setActiveSection(null)}
+        />
+      )}
+
+      {activeSection === "transactions" && (
+        <TransactionModal
+          transactions={dashboard.transactions}
           onClose={() => setActiveSection(null)}
         />
       )}

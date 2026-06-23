@@ -2,15 +2,23 @@ import { sellerApi } from "./api";
 
 class SellerService {
   async getProducts() {
-    const { data } = await sellerApi.get("/seller/public/products");
-
-    return data;
+    try {
+      const { data } = await sellerApi.get("/public/products");
+      return data;
+    } catch (error) {
+      console.log(error.message);
+      return [];
+    }
   }
 
   async getOrders() {
-    const { data } = await sellerApi.get("/seller/orders");
-
-    return data;
+    try {
+      const { data } = await sellerApi.get("/orders");
+      return data;
+    } catch (error) {
+      console.log(error.message);
+      return [];
+    }
   }
 
   async createOrder(payload: {
