@@ -7,6 +7,7 @@ interface AdminFormProps {
   onSave: (e: React.FormEvent) => void;
   onCancel: () => void;
   editingId?: string | null;
+  extraOptions?: Record<string, string[]>;
 }
 
 function formatLabelKey(key: string): string {
@@ -41,7 +42,8 @@ export default function AdminForm({
   setFormData,
   onSave,
   onCancel,
-  editingId
+  editingId,
+  extraOptions
 }: AdminFormProps) {
   // Obtenemos los campos del registro excluyendo el 'id' (que se autogenera) y 'severidad' si es la sección de disputas
   const fields = Object.entries(formData).filter(([key]) => {
@@ -67,7 +69,10 @@ export default function AdminForm({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {fields.map(([key, value]) => {
-          const selectOptions = getSelectOptions(key, sectionId);
+          let selectOptions = getSelectOptions(key, sectionId);
+          if (extraOptions && extraOptions[key]) {
+            selectOptions = extraOptions[key];
+          }
           const isNumber = typeof value === 'number';
 
           return (

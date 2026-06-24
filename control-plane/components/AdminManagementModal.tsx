@@ -1,10 +1,16 @@
 import { useState, useMemo, useEffect } from "react";
-import { mockDatabase } from "./admin-modal/mockData";
 import AdminTableHeader from "./admin-modal/AdminTableHeader";
 import AdminForm from "./admin-modal/AdminForm";
 import AdminTable from "./admin-modal/AdminTable";
 import AdminTablePagination from "./admin-modal/AdminTablePagination";
 import { useToast } from "@/components/Toast";
+
+// Base de datos local vacía en memoria de la sesión (sin usar mocks externos)
+const mockDatabase: Record<string, any[]> = {
+  ordenes: [],
+  carritos: [],
+  transacciones: [],
+};
 
 const DEFAULT_SCHEMAS: Record<string, Record<string, any>> = {
   usuarios: { nombre: "", email: "", rol: "Cliente", estado: "Activo" },
@@ -13,7 +19,7 @@ const DEFAULT_SCHEMAS: Record<string, Record<string, any>> = {
   carritos: { cliente: "", cantidadLibros: 1, totalEstimado: 0, estado: "Activo" },
   transacciones: { monto: 0, metodo: "MercadoPago", estado: "Pendiente" },
   disputas: { idOrden: "ORD-", motivo: "", estado: "Pendiente", severidad: "Baja", resolucion: "" },
-  envios: { idOrden: "ORD-", destino: "", correo: "Andreani", estado: "Preparación" }
+  envios: { idOrden: "ORD-", transportista: "Sin asignar", estado: "Preparación" }
 };
 
 interface AdminManagementModalProps {
@@ -33,14 +39,15 @@ export default function AdminManagementModal({
 }: AdminManagementModalProps) {
   const toast = useToast();
 
-  // Estado local sincronizado con la base de datos simulada en memoria, la API de Clerk o Payments API
+  // Estado local sincronizado con la base de datos simulada en memoria, la API de Clerk, Payments API o Shipping API
   const [records, setRecords] = useState<any[]>(() => {
-    if (sectionId === 'usuarios' || sectionId === 'productos' || sectionId === 'disputas') return [];
+    if (sectionId === 'usuarios' || sectionId === 'productos' || sectionId === 'disputas' || sectionId === 'envios') return [];
     return mockDatabase[sectionId] || [];
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [carriers, setCarriers] = useState<any[]>([]);
 
   // Estados de control para la gestión ABM
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -135,6 +142,50 @@ export default function AdminManagementModal({
     }
   };
 
+  // Cargar envíos y transportistas desde la API de Envíos
+  const fetchApiShipments = async () => {
+    try {
+      setLoading(true);
+      // Primero, traer los transportistas
+      const resCarriers = await fetch('/api/control/shipments/carriers');
+      const dataCarriers = await resCarriers.json();
+      let activeCarriers = [];
+      if (dataCarriers.success && dataCarriers.data) {
+        activeCarriers = dataCarriers.data;
+        setCarriers(dataCarriers.data);
+      }
+
+      // Luego, traer los envíos
+      const response = await fetch('/api/control/shipments');
+      const data = await response.json();
+      if (data.success && data.data) {
+        // Mapear cada envío reemplazando carrierId con su username, o "Sin asignar"
+        const mappedShipments = data.data.map((shipment: any) => {
+          const carrier = activeCarriers.find((c: any) => c.id === shipment.carrierId);
+          return {
+            id: shipment.id,
+            idOrden: shipment.idOrden,
+            transportista: carrier ? carrier.username : "Sin asignar",
+            estado: shipment.estado
+          };
+        });
+
+        setRecords(mappedShipments);
+        if (onUpdateCount) {
+          onUpdateCount('envios', mappedShipments.length);
+        }
+      } else {
+        console.error("Failed to fetch shipments:", data.error);
+        toast.error(`Error al cargar envíos: ${data.error}`);
+      }
+    } catch (error: any) {
+      console.error("Error fetching shipments/carriers:", error);
+      toast.error("Error de conexión al cargar envíos.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Sincronizar registros según la sección activa
   useEffect(() => {
     if (sectionId === 'usuarios') {
@@ -143,6 +194,8 @@ export default function AdminManagementModal({
       fetchApiProducts();
     } else if (sectionId === 'disputas') {
       fetchApiDisputes();
+    } else if (sectionId === 'envios') {
+      fetchApiShipments();
     } else {
       setRecords(mockDatabase[sectionId] || []);
     }
@@ -257,6 +310,36 @@ export default function AdminManagementModal({
       } catch (error) {
         console.error("Error editing dispute:", error);
         toast.error("Ocurrió un error inesperado al intentar modificar la disputa.");
+      } finally {
+        setLoading(false);
+        setIsFormOpen(false);
+      }
+    } else if (sectionId === 'envios') {
+      try {
+        setLoading(true);
+        // Buscar el ID del transportista por su username
+        const carrier = carriers.find((c) => c.username === formData.transportista);
+        const carrierId = carrier ? carrier.id : null;
+
+        const response = await fetch('/api/control/shipments', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingItem?.id,
+            estado: formData.estado,
+            carrierId: carrierId
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          await fetchApiShipments();
+          toast.success("Envío modificado exitosamente.");
+        } else {
+          toast.error(`Error al modificar el envío: ${data.error}`);
+        }
+      } catch (error) {
+        console.error("Error editing shipment:", error);
+        toast.error("Ocurrió un error inesperado al intentar modificar el envío.");
       } finally {
         setLoading(false);
         setIsFormOpen(false);
@@ -450,6 +533,11 @@ export default function AdminManagementModal({
               onSave={handleSave}
               onCancel={() => setIsFormOpen(false)}
               editingId={editingItem?.id}
+              extraOptions={
+                sectionId === 'envios'
+                  ? { transportista: ["Sin asignar", ...carriers.map((c) => c.username)] }
+                  : undefined
+              }
             />
           )}
 
@@ -461,7 +549,7 @@ export default function AdminManagementModal({
               setCurrentPage(1);
             }}
             onAddClick={handleOpenCreate}
-            showAdd={sectionId !== 'productos' && sectionId !== 'disputas'}
+            showAdd={sectionId !== 'productos' && sectionId !== 'disputas' && sectionId !== 'envios'}
           />
 
           {loading ? (

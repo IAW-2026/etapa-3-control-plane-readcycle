@@ -136,8 +136,46 @@ async function fetchExternalDisputesCount(): Promise<number> {
 }
 
 async function fetchExternalShipmentsCount(): Promise<number> {
-  await new Promise((resolve) => setTimeout(resolve, Math.random() * 200 + 50));
-  return 854;
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_SHIPPING_API_URL;
+    const apiKey = process.env.SHIPPING_APIKEY;
+
+    if (!baseUrl || !apiKey) {
+      console.warn("Warning: NEXT_PUBLIC_SHIPPING_API_URL or SHIPPING_APIKEY env vars are not set");
+      return 0;
+    }
+
+    let url = baseUrl;
+    if (url.endsWith('/api/')) {
+      url = `${url}shipments`;
+    } else if (url.endsWith('/api')) {
+      url = `${url}/shipments`;
+    } else {
+      const cleanBase = url.endsWith('/') ? url.slice(0, -1) : url;
+      url = `${cleanBase}/api/shipments`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-API-Key": apiKey,
+        "Accept": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch shipments from API: ${response.status} ${response.statusText}`);
+      return 0;
+    }
+
+    const data = await response.json();
+    const rawShipments = Array.isArray(data) ? data : (data?.data || []);
+    return rawShipments.length;
+  } catch (error) {
+    console.error("Error fetching shipments count from shipping API:", error);
+    return 0;
+  }
 }
 
 export async function GET() {

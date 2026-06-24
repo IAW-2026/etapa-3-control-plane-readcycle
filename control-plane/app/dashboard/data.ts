@@ -30,7 +30,7 @@ export const dashboardMetrics: DashboardMetric[] = [
   {
     id: 'usuarios',
     name: 'Usuarios',
-    count: 2480,
+    count: 0,
     unit: 'usuarios registrados',
     group: 'comunidad',
     description: 'Control de perfiles, activación, suspensiones y permisos.',
@@ -38,7 +38,7 @@ export const dashboardMetrics: DashboardMetric[] = [
   {
     id: 'productos',
     name: 'Productos',
-    count: 8432,
+    count: 0,
     unit: 'libros publicados',
     group: 'comercio',
     description: 'Gestión del catálogo, libros en intercambio y categorías.',
@@ -46,7 +46,7 @@ export const dashboardMetrics: DashboardMetric[] = [
   {
     id: 'disputas',
     name: 'Disputas',
-    count: 14,
+    count: 0,
     unit: 'casos reportados',
     group: 'soporte',
     description: 'Moderación de reclamos sobre el estado de libros o envíos.',
@@ -54,7 +54,7 @@ export const dashboardMetrics: DashboardMetric[] = [
   {
     id: 'envios',
     name: 'Envíos',
-    count: 854,
+    count: 0,
     unit: 'despachos gestionados',
     group: 'logistica',
     description: 'Integraciones postales, etiquetas y entregas a domicilio.',

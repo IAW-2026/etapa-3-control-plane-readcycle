@@ -173,7 +173,7 @@ export default function AdminTable({
                             </svg>
                           </button>
                         )}
-                        {sectionId !== 'disputas' && (
+                        {sectionId !== 'disputas' && sectionId !== 'envios' && (
                           <button
                             onClick={() => onDeleteClick(row.id)}
                             className="p-1 text-brand-clay hover:bg-brand-clay/10 rounded-lg transition-colors cursor-pointer"
