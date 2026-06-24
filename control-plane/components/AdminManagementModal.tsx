@@ -35,7 +35,7 @@ export default function AdminManagementModal({
 
   // Estado local sincronizado con la base de datos simulada en memoria o la API de Clerk
   const [records, setRecords] = useState<any[]>(() => {
-    if (sectionId === 'usuarios') return [];
+    if (sectionId === 'usuarios' || sectionId === 'productos') return [];
     return mockDatabase[sectionId] || [];
   });
   const [searchTerm, setSearchTerm] = useState("");
@@ -63,7 +63,7 @@ export default function AdminManagementModal({
     confirmText: "Confirmar",
     cancelText: "Cancelar",
     confirmColor: "clay",
-    onConfirm: () => {}
+    onConfirm: () => { }
   });
 
   // Cargar usuarios desde la API de Clerk
@@ -89,10 +89,35 @@ export default function AdminManagementModal({
     }
   };
 
+  // Cargar productos desde la API
+  const fetchApiProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/control/products');
+      const data = await response.json();
+      if (data.success && data.data) {
+        setRecords(data.data);
+        if (onUpdateCount) {
+          onUpdateCount('productos', data.data.length);
+        }
+      } else {
+        console.error("Failed to fetch products:", data.error);
+        toast.error(`Error al cargar productos: ${data.error}`);
+      }
+    } catch (error: any) {
+      console.error("Error fetching products:", error);
+      toast.error("Error de conexión al cargar productos.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Sincronizar registros según la sección activa
   useEffect(() => {
     if (sectionId === 'usuarios') {
       fetchClerkUsers();
+    } else if (sectionId === 'productos') {
+      fetchApiProducts();
     } else {
       setRecords(mockDatabase[sectionId] || []);
     }
@@ -111,7 +136,7 @@ export default function AdminManagementModal({
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
       const searchStr = searchTerm.toLowerCase();
-      return Object.values(r).some((val) => 
+      return Object.values(r).some((val) =>
         String(val).toLowerCase().includes(searchStr)
       );
     });
@@ -133,8 +158,8 @@ export default function AdminManagementModal({
     if (sectionId === 'usuarios') {
       initialForm = { nombre: "", email: "", password: "", rol: "Cliente" };
     } else {
-      const schemaSource = records.length > 0 
-        ? records[0] 
+      const schemaSource = records.length > 0
+        ? records[0]
         : (DEFAULT_SCHEMAS[sectionId] || {});
 
       Object.entries(schemaSource).forEach(([key, val]) => {
@@ -196,8 +221,8 @@ export default function AdminManagementModal({
         const newRecord = {
           id: `${prefix}-${randomId}`,
           ...formData,
-          ...(formData.fecha === undefined && (sectionId === 'ordenes' || sectionId === 'transacciones') 
-            ? { fecha: new Date().toISOString().split('T')[0] } 
+          ...(formData.fecha === undefined && (sectionId === 'ordenes' || sectionId === 'transacciones')
+            ? { fecha: new Date().toISOString().split('T')[0] }
             : {})
         };
         updateDatabase([newRecord, ...records]);
@@ -212,8 +237,8 @@ export default function AdminManagementModal({
   const handleDelete = (id: string) => {
     setConfirmState({
       isOpen: true,
-      title: "Eliminar Registro",
-      message: `¿Estás seguro de que deseas eliminar permanentemente el registro ${id}? Esta acción no se puede deshacer y borrará los datos asociados.`,
+      title: "Eliminar Publicación",
+      message: `¿Estás seguro de que deseas eliminar la publicacion ${id}?`,
       confirmText: "Eliminar",
       cancelText: "Cancelar",
       confirmColor: "clay",
@@ -236,6 +261,25 @@ export default function AdminManagementModal({
           } catch (error) {
             console.error("Error deleting user:", error);
             toast.error("Ocurrió un error inesperado al intentar eliminar el usuario.");
+          } finally {
+            setLoading(false);
+          }
+        } else if (sectionId === 'productos') {
+          try {
+            setLoading(true);
+            const response = await fetch(`/api/control/products?id=${id}`, {
+              method: 'DELETE',
+            });
+            const data = await response.json();
+            if (data.success) {
+              await fetchApiProducts();
+              toast.success("Producto eliminado exitosamente.");
+            } else {
+              toast.error(`Error al eliminar el producto: ${data.error}`);
+            }
+          } catch (error) {
+            console.error("Error deleting product:", error);
+            toast.error("Ocurrió un error inesperado al intentar eliminar el producto.");
           } finally {
             setLoading(false);
           }
@@ -322,7 +366,7 @@ export default function AdminManagementModal({
 
       {/* Ventana Modal principal */}
       <div className="relative bg-brand-beige rounded-3xl border border-brand-sand shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-up z-10">
-        
+
         {/* Encabezado */}
         <header className="bg-white border-b border-brand-sand px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -333,7 +377,7 @@ export default function AdminManagementModal({
               {sectionName}
             </h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-1.5 rounded-full hover:bg-brand-sand/40 text-brand-forest/60 hover:text-brand-forest transition-colors cursor-pointer"
           >
@@ -365,6 +409,7 @@ export default function AdminManagementModal({
               setCurrentPage(1);
             }}
             onAddClick={handleOpenCreate}
+            showAdd={sectionId !== 'productos'}
           />
 
           {loading ? (
@@ -398,17 +443,16 @@ export default function AdminManagementModal({
       {/* Custom Confirmation Modal Dialog */}
       {confirmState.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-forest/60 backdrop-blur-sm animate-fade-in">
-          <div 
-            className="absolute inset-0 cursor-default" 
+          <div
+            className="absolute inset-0 cursor-default"
             onClick={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
           ></div>
           <div className="relative bg-white rounded-3xl border border-brand-sand shadow-2xl p-6 max-w-sm w-full space-y-4 animate-scale-up z-10">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-full border ${
-                confirmState.confirmColor === 'sage' 
-                  ? 'bg-brand-sage/10 border-brand-sage/20 text-brand-sage' 
-                  : 'bg-brand-clay/10 border-brand-clay/20 text-brand-clay'
-              }`}>
+              <div className={`p-2 rounded-full border ${confirmState.confirmColor === 'sage'
+                ? 'bg-brand-sage/10 border-brand-sage/20 text-brand-sage'
+                : 'bg-brand-clay/10 border-brand-clay/20 text-brand-clay'
+                }`}>
                 {confirmState.confirmColor === 'sage' ? (
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -440,11 +484,10 @@ export default function AdminManagementModal({
                   confirmState.onConfirm();
                   setConfirmState(prev => ({ ...prev, isOpen: false }));
                 }}
-                className={`px-5 py-2 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer ${
-                  confirmState.confirmColor === 'sage' 
-                    ? 'bg-brand-sage hover:bg-brand-forest' 
-                    : 'bg-brand-clay hover:bg-brand-forest'
-                }`}
+                className={`px-5 py-2 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer ${confirmState.confirmColor === 'sage'
+                  ? 'bg-brand-sage hover:bg-brand-forest'
+                  : 'bg-brand-clay hover:bg-brand-forest'
+                  }`}
               >
                 {confirmState.confirmText || "Confirmar"}
               </button>

@@ -15,8 +15,56 @@ async function fetchExternalUsersCount(): Promise<number> {
 }
 
 async function fetchExternalProductsCount(): Promise<number> {
-  await new Promise((resolve) => setTimeout(resolve, Math.random() * 200 + 50));
-  return 8432;
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_SELLER_API_URL;
+    const apiKey = process.env.SELLER_APIKEY;
+
+    if (!baseUrl || !apiKey) {
+      console.warn("Warning: NEXT_PUBLIC_SELLER_API_URL or SELLER_APIKEY env vars are not set");
+      return 0;
+    }
+
+    // Safely combine base URL and path to avoid double slashes or duplication
+    let url = baseUrl;
+    if (url.endsWith('/api/')) {
+      url = `${url}public/products`;
+    } else if (url.endsWith('/api')) {
+      url = `${url}/public/products`;
+    } else {
+      const cleanBase = url.endsWith('/') ? url.slice(0, -1) : url;
+      url = `${cleanBase}/api/public/products`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-API-Key": apiKey,
+        "Accept": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch products from API: ${response.status} ${response.statusText}`);
+      return 0;
+    }
+
+    const data = await response.json();
+    if (Array.isArray(data)) {
+      return data.length;
+    }
+
+    if (data && typeof data === 'object') {
+      if (Array.isArray(data.products)) return data.products.length;
+      if (Array.isArray(data.data)) return data.data.length;
+    }
+
+    console.error("Expected array or object with array from products API, got:", typeof data);
+    return 0;
+  } catch (error) {
+    console.error("Error fetching products count from seller API:", error);
+    return 0;
+  }
 }
 
 async function fetchExternalOrdersCount(): Promise<number> {
