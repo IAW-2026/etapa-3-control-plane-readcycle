@@ -83,8 +83,56 @@ async function fetchExternalTransactionsCount(): Promise<number> {
 }
 
 async function fetchExternalDisputesCount(): Promise<number> {
-  await new Promise((resolve) => setTimeout(resolve, Math.random() * 200 + 50));
-  return 14;
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_PAYMENTS_API_URL;
+    const apiKey = process.env.DISPUTES_API_KEY;
+
+    if (!baseUrl || !apiKey) {
+      console.warn("Warning: NEXT_PUBLIC_PAYMENTS_API_URL or DISPUTES_API_KEY env vars are not set");
+      return 0;
+    }
+
+    // Safely combine base URL and path
+    let url = baseUrl;
+    if (url.endsWith('/api/')) {
+      url = `${url}payments/disputes`;
+    } else if (url.endsWith('/api')) {
+      url = `${url}/payments/disputes`;
+    } else {
+      const cleanBase = url.endsWith('/') ? url.slice(0, -1) : url;
+      url = `${cleanBase}/api/payments/disputes`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-API-Key": apiKey,
+        "Accept": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch disputes from API: ${response.status} ${response.statusText}`);
+      return 0;
+    }
+
+    const data = await response.json();
+    let rawDisputes: any[] = [];
+    if (Array.isArray(data)) {
+      rawDisputes = data;
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.disputes)) rawDisputes = data.disputes;
+      else if (Array.isArray(data.data)) rawDisputes = data.data;
+    }
+
+    // Filter by active disputes: status === 'OPEN' || status === 'REVIEWING'
+    const activeCount = rawDisputes.filter((d: any) => d.status === 'OPEN' || d.status === 'REVIEWING').length;
+    return activeCount;
+  } catch (error) {
+    console.error("Error fetching disputes count from payments API:", error);
+    return 0;
+  }
 }
 
 async function fetchExternalShipmentsCount(): Promise<number> {

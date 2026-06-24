@@ -12,7 +12,7 @@ const DEFAULT_SCHEMAS: Record<string, Record<string, any>> = {
   ordenes: { cliente: "", total: 0, estado: "Pendiente" },
   carritos: { cliente: "", cantidadLibros: 1, totalEstimado: 0, estado: "Activo" },
   transacciones: { monto: 0, metodo: "MercadoPago", estado: "Pendiente" },
-  disputas: { idOrden: "ORD-", motivo: "", estado: "Pendiente", severidad: "Baja" },
+  disputas: { idOrden: "ORD-", motivo: "", estado: "Pendiente", severidad: "Baja", resolucion: "" },
   envios: { idOrden: "ORD-", destino: "", correo: "Andreani", estado: "Preparación" }
 };
 
@@ -33,9 +33,9 @@ export default function AdminManagementModal({
 }: AdminManagementModalProps) {
   const toast = useToast();
 
-  // Estado local sincronizado con la base de datos simulada en memoria o la API de Clerk
+  // Estado local sincronizado con la base de datos simulada en memoria, la API de Clerk o Payments API
   const [records, setRecords] = useState<any[]>(() => {
-    if (sectionId === 'usuarios' || sectionId === 'productos') return [];
+    if (sectionId === 'usuarios' || sectionId === 'productos' || sectionId === 'disputas') return [];
     return mockDatabase[sectionId] || [];
   });
   const [searchTerm, setSearchTerm] = useState("");
@@ -112,12 +112,37 @@ export default function AdminManagementModal({
     }
   };
 
+  // Cargar disputas desde la API de Pagos
+  const fetchApiDisputes = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/control/disputes');
+      const data = await response.json();
+      if (data.success && data.data) {
+        setRecords(data.data);
+        if (onUpdateCount) {
+          onUpdateCount('disputas', data.data.length);
+        }
+      } else {
+        console.error("Failed to fetch disputes:", data.error);
+        toast.error(`Error al cargar disputas: ${data.error}`);
+      }
+    } catch (error: any) {
+      console.error("Error fetching disputes:", error);
+      toast.error("Error de conexión al cargar disputas.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Sincronizar registros según la sección activa
   useEffect(() => {
     if (sectionId === 'usuarios') {
       fetchClerkUsers();
     } else if (sectionId === 'productos') {
       fetchApiProducts();
+    } else if (sectionId === 'disputas') {
+      fetchApiDisputes();
     } else {
       setRecords(mockDatabase[sectionId] || []);
     }
@@ -210,6 +235,32 @@ export default function AdminManagementModal({
       } finally {
         setLoading(false);
       }
+    } else if (sectionId === 'disputas') {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/control/disputes', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingItem?.id,
+            estado: formData.estado,
+            resolucion: formData.resolucion
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          await fetchApiDisputes();
+          toast.success("Disputa modificada exitosamente.");
+        } else {
+          toast.error(`Error al modificar la disputa: ${data.error}`);
+        }
+      } catch (error) {
+        console.error("Error editing dispute:", error);
+        toast.error("Ocurrió un error inesperado al intentar modificar la disputa.");
+      } finally {
+        setLoading(false);
+        setIsFormOpen(false);
+      }
     } else {
       if (editingItem) {
         const updated = records.map((r) => (r.id === editingItem.id ? { ...formData } : r));
@@ -284,6 +335,7 @@ export default function AdminManagementModal({
             setLoading(false);
           }
         } else {
+          if (sectionId === 'disputas') return;
           const updated = records.filter((r) => r.id !== id);
           updateDatabase(updated);
           toast.success("Registro eliminado correctamente.");
@@ -409,7 +461,7 @@ export default function AdminManagementModal({
               setCurrentPage(1);
             }}
             onAddClick={handleOpenCreate}
-            showAdd={sectionId !== 'productos'}
+            showAdd={sectionId !== 'productos' && sectionId !== 'disputas'}
           />
 
           {loading ? (

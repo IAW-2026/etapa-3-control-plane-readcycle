@@ -29,7 +29,7 @@ function getSelectOptions(key: string, sectionId: string): string[] | null {
     if (sectionId === 'ordenes') return ["Pendiente", "Procesando", "Completada", "Cancelada"];
     if (sectionId === 'carritos') return ["Activo", "Abandonado"];
     if (sectionId === 'transacciones') return ["Pendiente", "Aprobada", "Rechazada"];
-    if (sectionId === 'disputas') return ["Pendiente", "En Revisión", "Resuelta"];
+    if (sectionId === 'disputas') return ["Pendiente", "En Revisión", "Resuelta", "Rechazada"];
     if (sectionId === 'envios') return ["Preparación", "En Camino", "Entregado"];
   }
   return null;
@@ -43,8 +43,12 @@ export default function AdminForm({
   onCancel,
   editingId
 }: AdminFormProps) {
-  // Obtenemos los campos del registro excluyendo el 'id' (que se autogenera)
-  const fields = Object.entries(formData).filter(([key]) => key !== 'id');
+  // Obtenemos los campos del registro excluyendo el 'id' (que se autogenera) y 'severidad' si es la sección de disputas
+  const fields = Object.entries(formData).filter(([key]) => {
+    if (key === 'id') return false;
+    if (sectionId === 'disputas' && key === 'severidad') return false;
+    return true;
+  });
 
   return (
     <form onSubmit={onSave} className="bg-white p-5 rounded-2xl border border-brand-sage/20 shadow-md space-y-4 animate-fade-in">
