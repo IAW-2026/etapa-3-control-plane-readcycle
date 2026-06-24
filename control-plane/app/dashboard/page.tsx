@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { dashboardMetrics, groupNames, DashboardMetric } from "./data";
 import DashboardCard from "@/components/DashboardCard";
@@ -16,6 +16,18 @@ export default function DashboardPage() {
             return acc;
         }, {} as Record<string, number>)
     );
+
+    // Cargar métricas reales desde la API al montar el componente
+    useEffect(() => {
+        fetch('/api/control/dashboard')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    setCounts(data.data);
+                }
+            })
+            .catch(err => console.error("Error al obtener las métricas del dashboard:", err));
+    }, []);
 
     // Agrupamiento dinámico de métricas utilizando los contadores locales actualizados
     const groupedMetrics = Object.keys(groupNames).reduce((acc, key) => {

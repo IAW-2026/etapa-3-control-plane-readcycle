@@ -1,11 +1,10 @@
-'use client';
-
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { mockDatabase } from "./admin-modal/mockData";
 import AdminTableHeader from "./admin-modal/AdminTableHeader";
 import AdminForm from "./admin-modal/AdminForm";
 import AdminTable from "./admin-modal/AdminTable";
 import AdminTablePagination from "./admin-modal/AdminTablePagination";
+import { useToast } from "@/components/Toast";
 
 const DEFAULT_SCHEMAS: Record<string, Record<string, any>> = {
   usuarios: { nombre: "", email: "", rol: "Cliente", estado: "Activo" },
@@ -32,15 +31,72 @@ export default function AdminManagementModal({
   onClose,
   onUpdateCount
 }: AdminManagementModalProps) {
-  // Estado local sincronizado con la base de datos simulada en memoria
-  const [records, setRecords] = useState<any[]>(() => mockDatabase[sectionId] || []);
+  const toast = useToast();
+
+  // Estado local sincronizado con la base de datos simulada en memoria o la API de Clerk
+  const [records, setRecords] = useState<any[]>(() => {
+    if (sectionId === 'usuarios') return [];
+    return mockDatabase[sectionId] || [];
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(false);
 
   // Estados de control para la gestión ABM
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
+
+  // Estado para el modal de confirmación personalizado
+  const [confirmState, setConfirmState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    confirmColor?: 'clay' | 'sage';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirmar",
+    cancelText: "Cancelar",
+    confirmColor: "clay",
+    onConfirm: () => {}
+  });
+
+  // Cargar usuarios desde la API de Clerk
+  const fetchClerkUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/control/users');
+      const data = await response.json();
+      if (data.success && data.data) {
+        setRecords(data.data);
+        if (onUpdateCount) {
+          onUpdateCount('usuarios', data.data.length);
+        }
+      } else {
+        console.error("Failed to fetch Clerk users:", data.error);
+        toast.error(`Error al cargar usuarios de Clerk: ${data.error}`);
+      }
+    } catch (error: any) {
+      console.error("Error fetching Clerk users:", error);
+      toast.error("Error de conexión al cargar usuarios.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sincronizar registros según la sección activa
+  useEffect(() => {
+    if (sectionId === 'usuarios') {
+      fetchClerkUsers();
+    } else {
+      setRecords(mockDatabase[sectionId] || []);
+    }
+  }, [sectionId]);
 
   // Guardar cambios en el almacenamiento simulado y actualizar el dashboard
   const updateDatabase = (newRecords: any[]) => {
@@ -70,19 +126,23 @@ export default function AdminManagementModal({
     return filteredRecords.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredRecords, safeCurrentPage]);
 
-  // Inicializar formulario de creación (Alta) de forma genérica
+  // Inicializar formulario de creación (Alta)
   const handleOpenCreate = () => {
     setEditingItem(null);
-    const initialForm: Record<string, any> = {};
-    const schemaSource = records.length > 0 
-      ? records[0] 
-      : (DEFAULT_SCHEMAS[sectionId] || {});
+    let initialForm: Record<string, any> = {};
+    if (sectionId === 'usuarios') {
+      initialForm = { nombre: "", email: "", password: "", rol: "Cliente" };
+    } else {
+      const schemaSource = records.length > 0 
+        ? records[0] 
+        : (DEFAULT_SCHEMAS[sectionId] || {});
 
-    Object.entries(schemaSource).forEach(([key, val]) => {
-      if (key !== 'id') {
-        initialForm[key] = typeof val === 'number' ? 0 : "";
-      }
-    });
+      Object.entries(schemaSource).forEach(([key, val]) => {
+        if (key !== 'id') {
+          initialForm[key] = typeof val === 'number' ? 0 : "";
+        }
+      });
+    }
     setFormData(initialForm);
     setIsFormOpen(true);
   };
@@ -95,33 +155,165 @@ export default function AdminManagementModal({
   };
 
   // Confirmar Guardado (Alta / Modificación)
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      const updated = records.map((r) => (r.id === editingItem.id ? { ...formData } : r));
-      updateDatabase(updated);
+    if (sectionId === 'usuarios') {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/control/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'create',
+            nombre: formData.nombre,
+            email: formData.email,
+            password: formData.password,
+            rol: formData.rol
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          await fetchClerkUsers();
+          setIsFormOpen(false);
+          toast.success("Usuario creado exitosamente en Clerk.");
+        } else {
+          toast.error(`Error al crear usuario en Clerk: ${data.error}`);
+        }
+      } catch (error) {
+        console.error("Error creating user:", error);
+        toast.error("Ocurrió un error inesperado al intentar crear el usuario.");
+      } finally {
+        setLoading(false);
+      }
     } else {
-      const prefix = sectionId.substring(0, 3).toUpperCase();
-      const randomId = Math.floor(100 + Math.random() * 900);
-      const newRecord = {
-        id: `${prefix}-${randomId}`,
-        ...formData,
-        ...(formData.fecha === undefined && (sectionId === 'ordenes' || sectionId === 'transacciones') 
-          ? { fecha: new Date().toISOString().split('T')[0] } 
-          : {})
-      };
-      updateDatabase([newRecord, ...records]);
-      setCurrentPage(1); // Volver a la primera página para visualizar la inserción
+      if (editingItem) {
+        const updated = records.map((r) => (r.id === editingItem.id ? { ...formData } : r));
+        updateDatabase(updated);
+        toast.success("Registro modificado correctamente.");
+      } else {
+        const prefix = sectionId.substring(0, 3).toUpperCase();
+        const randomId = Math.floor(100 + Math.random() * 900);
+        const newRecord = {
+          id: `${prefix}-${randomId}`,
+          ...formData,
+          ...(formData.fecha === undefined && (sectionId === 'ordenes' || sectionId === 'transacciones') 
+            ? { fecha: new Date().toISOString().split('T')[0] } 
+            : {})
+        };
+        updateDatabase([newRecord, ...records]);
+        setCurrentPage(1); // Volver a la primera página para visualizar la inserción
+        toast.success("Nuevo registro creado correctamente.");
+      }
+      setIsFormOpen(false);
     }
-    setIsFormOpen(false);
   };
 
   // Eliminar registro (Baja)
   const handleDelete = (id: string) => {
-    if (confirm(`¿Estás seguro de que deseas eliminar el registro ${id}?`)) {
-      const updated = records.filter((r) => r.id !== id);
-      updateDatabase(updated);
-    }
+    setConfirmState({
+      isOpen: true,
+      title: "Eliminar Registro",
+      message: `¿Estás seguro de que deseas eliminar permanentemente el registro ${id}? Esta acción no se puede deshacer y borrará los datos asociados.`,
+      confirmText: "Eliminar",
+      cancelText: "Cancelar",
+      confirmColor: "clay",
+      onConfirm: async () => {
+        if (sectionId === 'usuarios') {
+          try {
+            setLoading(true);
+            const response = await fetch('/api/control/users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: id, action: 'delete' })
+            });
+            const data = await response.json();
+            if (data.success) {
+              await fetchClerkUsers();
+              toast.success("Usuario eliminado exitosamente de Clerk.");
+            } else {
+              toast.error(`Error al eliminar en Clerk: ${data.error}`);
+            }
+          } catch (error) {
+            console.error("Error deleting user:", error);
+            toast.error("Ocurrió un error inesperado al intentar eliminar el usuario.");
+          } finally {
+            setLoading(false);
+          }
+        } else {
+          const updated = records.filter((r) => r.id !== id);
+          updateDatabase(updated);
+          toast.success("Registro eliminado correctamente.");
+        }
+      }
+    });
+  };
+
+  // Suspender usuario (Clerk)
+  const handleSuspend = (id: string) => {
+    setConfirmState({
+      isOpen: true,
+      title: "Suspender Usuario",
+      message: `¿Estás seguro de que deseas suspender al usuario con ID ${id}? Esto revocará sus sesiones activas y le impedirá iniciar sesión en la plataforma.`,
+      confirmText: "Suspender",
+      cancelText: "Cancelar",
+      confirmColor: "clay",
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          const response = await fetch('/api/control/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: id, action: 'suspend' })
+          });
+          const data = await response.json();
+          if (data.success) {
+            await fetchClerkUsers();
+            toast.success("Usuario suspendido correctamente en Clerk.");
+          } else {
+            toast.error(`Error al suspender en Clerk: ${data.error}`);
+          }
+        } catch (error) {
+          console.error("Error suspending user:", error);
+          toast.error("Ocurrió un error inesperado al intentar suspender el usuario.");
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  };
+
+  // Activar usuario (Clerk)
+  const handleActivate = (id: string) => {
+    setConfirmState({
+      isOpen: true,
+      title: "Activar Usuario",
+      message: `¿Estás seguro de que deseas activar al usuario con ID ${id}? Esto le permitirá volver a iniciar sesión y utilizar todas las funciones del sitio.`,
+      confirmText: "Activar",
+      cancelText: "Cancelar",
+      confirmColor: "sage",
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          const response = await fetch('/api/control/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: id, action: 'activate' })
+          });
+          const data = await response.json();
+          if (data.success) {
+            await fetchClerkUsers();
+            toast.success("Usuario activado correctamente en Clerk.");
+          } else {
+            toast.error(`Error al activar en Clerk: ${data.error}`);
+          }
+        } catch (error) {
+          console.error("Error activating user:", error);
+          toast.error("Ocurrió un error inesperado al intentar activar el usuario.");
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   return (
@@ -129,7 +321,7 @@ export default function AdminManagementModal({
       <div className="absolute inset-0 cursor-default" onClick={onClose}></div>
 
       {/* Ventana Modal principal */}
-      <div className="relative bg-brand-beige rounded-3xl border border-brand-sand shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-up z-10">
+      <div className="relative bg-brand-beige rounded-3xl border border-brand-sand shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-up z-10">
         
         {/* Encabezado */}
         <header className="bg-white border-b border-brand-sand px-6 py-4 flex items-center justify-between">
@@ -175,22 +367,91 @@ export default function AdminManagementModal({
             onAddClick={handleOpenCreate}
           />
 
-          {/* Tabla de registros */}
-          <AdminTable
-            sectionId={sectionId}
-            records={paginatedRecords}
-            onEditClick={handleOpenEdit}
-            onDeleteClick={handleDelete}
-          />
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-brand-sand/60 shadow-sm space-y-3">
+              <div className="w-9 h-9 border-4 border-brand-sage/20 border-t-brand-sage rounded-full animate-spin"></div>
+              <p className="text-xs font-semibold text-brand-forest/60 tracking-wider uppercase">Procesando datos...</p>
+            </div>
+          ) : (
+            <>
+              {/* Tabla de registros */}
+              <AdminTable
+                sectionId={sectionId}
+                records={paginatedRecords}
+                onEditClick={handleOpenEdit}
+                onDeleteClick={handleDelete}
+                onSuspendClick={handleSuspend}
+                onActivateClick={handleActivate}
+              />
 
-          {/* Barra inferior de paginación */}
-          <AdminTablePagination
-            currentPage={safeCurrentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
+              {/* Barra inferior de paginación */}
+              <AdminTablePagination
+                currentPage={safeCurrentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            </>
+          )}
         </div>
       </div>
+
+      {/* Custom Confirmation Modal Dialog */}
+      {confirmState.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-forest/60 backdrop-blur-sm animate-fade-in">
+          <div 
+            className="absolute inset-0 cursor-default" 
+            onClick={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+          ></div>
+          <div className="relative bg-white rounded-3xl border border-brand-sand shadow-2xl p-6 max-w-sm w-full space-y-4 animate-scale-up z-10">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-full border ${
+                confirmState.confirmColor === 'sage' 
+                  ? 'bg-brand-sage/10 border-brand-sage/20 text-brand-sage' 
+                  : 'bg-brand-clay/10 border-brand-clay/20 text-brand-clay'
+              }`}>
+                {confirmState.confirmColor === 'sage' ? (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376C1.83 19.126 2.914 21 4.645 21h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 17.626zM12 17.25h.007v.008H12v-.008z" />
+                  </svg>
+                )}
+              </div>
+              <h3 className="text-base font-bold text-brand-forest">
+                {confirmState.title}
+              </h3>
+            </div>
+            <p className="text-xs text-brand-forest/70 font-light leading-relaxed">
+              {confirmState.message}
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-brand-sand/50">
+              <button
+                type="button"
+                onClick={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 border border-brand-sand rounded-xl text-xs font-semibold text-brand-forest/70 hover:bg-brand-beige transition-colors cursor-pointer"
+              >
+                {confirmState.cancelText || "Cancelar"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmState.onConfirm();
+                  setConfirmState(prev => ({ ...prev, isOpen: false }));
+                }}
+                className={`px-5 py-2 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer ${
+                  confirmState.confirmColor === 'sage' 
+                    ? 'bg-brand-sage hover:bg-brand-forest' 
+                    : 'bg-brand-clay hover:bg-brand-forest'
+                }`}
+              >
+                {confirmState.confirmText || "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

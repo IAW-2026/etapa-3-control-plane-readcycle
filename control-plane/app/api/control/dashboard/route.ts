@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
+import { clerkClient } from "@clerk/nextjs/server";
 
 // Simulación de llamadas externas independientes.
 // En el futuro, estas funciones harán fetches reales a microservicios externos distribuidos.
 async function fetchExternalUsersCount(): Promise<number> {
-  await new Promise((resolve) => setTimeout(resolve, Math.random() * 200 + 50)); // Simula latencia
-  return 2480;
+  try {
+    const client = await clerkClient();
+    const { totalCount } = await client.users.getUserList();
+    return totalCount;
+  } catch (error) {
+    console.error("Error fetching Clerk users count for dashboard:", error);
+    return 0;
+  }
 }
 
 async function fetchExternalProductsCount(): Promise<number> {

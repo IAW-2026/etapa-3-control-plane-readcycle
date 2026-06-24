@@ -86,7 +86,7 @@ export default function AdminForm({
                 </select>
               ) : (
                 <input
-                  type={isNumber ? "number" : "text"}
+                  type={key === 'password' ? 'password' : (isNumber ? "number" : "text")}
                   required
                   min={isNumber ? "0" : undefined}
                   value={formData[key] ?? ""}
