@@ -20,7 +20,7 @@ function formatLabelKey(key: string): string {
 
 function getSelectOptions(key: string, sectionId: string): string[] | null {
   const lowerKey = key.toLowerCase();
-  if (lowerKey === 'rol') return ["Cliente", "Moderador", "Administrador"];
+  if (lowerKey === 'rol') return ["ADMIN", "CARRIER", "OPERATOR", "SELLER", "BUYER"];
   if (lowerKey === 'metodo') return ["MercadoPago", "Tarjeta de Crédito", "Tarjeta de Débito", "Transferencia"];
   if (lowerKey === 'correo') return ["Andreani", "Correo Argentino", "OCA"];
   if (lowerKey === 'severidad') return ["Baja", "Media", "Alta"];
@@ -31,7 +31,7 @@ function getSelectOptions(key: string, sectionId: string): string[] | null {
     if (sectionId === 'carritos') return ["Activo", "Abandonado"];
     if (sectionId === 'transacciones') return ["Pendiente", "Aprobada", "Rechazada"];
     if (sectionId === 'disputas') return ["Pendiente", "En Revisión", "Resuelta", "Rechazada"];
-    if (sectionId === 'envios') return ["Preparación", "En Camino", "Entregado"];
+    if (sectionId === 'envios') return ["PENDING", "PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED", "FAILED", "CANCELLED"];
   }
   return null;
 }
@@ -74,6 +74,7 @@ export default function AdminForm({
             selectOptions = extraOptions[key];
           }
           const isNumber = typeof value === 'number';
+          const isDisabled = key === 'idOrden' && (sectionId === 'disputas' || sectionId === 'envios');
 
           return (
             <div key={key} className="flex flex-col gap-1">
@@ -85,7 +86,8 @@ export default function AdminForm({
                 <select
                   value={formData[key] ?? selectOptions[0]}
                   onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
-                  className="border border-brand-sand rounded-xl px-3 py-2 bg-brand-beige/40 focus:outline-none focus:border-brand-sage focus:ring-1 focus:ring-brand-sage text-sm cursor-pointer"
+                  disabled={isDisabled}
+                  className="border border-brand-sand rounded-xl px-3 py-2 bg-brand-beige/40 focus:outline-none focus:border-brand-sage focus:ring-1 focus:ring-brand-sage text-sm cursor-pointer disabled:opacity-50 disabled:bg-brand-sand/20 disabled:cursor-not-allowed"
                 >
                   {selectOptions.map((opt) => (
                     <option key={opt} value={opt}>
@@ -96,15 +98,16 @@ export default function AdminForm({
               ) : (
                 <input
                   type={key === 'password' ? 'password' : (isNumber ? "number" : "text")}
-                  required
+                  required={!isDisabled}
+                  disabled={isDisabled}
                   min={isNumber ? "0" : undefined}
                   value={formData[key] ?? ""}
                   onChange={(e) => setFormData({
                     ...formData,
                     [key]: isNumber ? Number(e.target.value) : e.target.value
                   })}
-                  placeholder={`Ingrese ${formatLabelKey(key).toLowerCase()}...`}
-                  className="border border-brand-sand rounded-xl px-3 py-2 bg-brand-beige/40 focus:outline-none focus:border-brand-sage focus:ring-1 focus:ring-brand-sage text-sm"
+                  placeholder={isDisabled ? "No editable" : `Ingrese ${formatLabelKey(key).toLowerCase()}...`}
+                  className="border border-brand-sand rounded-xl px-3 py-2 bg-brand-beige/40 focus:outline-none focus:border-brand-sage focus:ring-1 focus:ring-brand-sage text-sm disabled:opacity-50 disabled:bg-brand-sand/20 disabled:cursor-not-allowed"
                 />
               )}
             </div>

@@ -19,9 +19,9 @@ function formatHeaderKey(key: string): string {
 }
 
 function renderStatusBadge(val: string) {
-  const positiveStates = ["activo", "aprobada", "entregado", "completada", "resuelta"];
-  const warningStates = ["procesando", "en camino", "pendiente", "en revisión", "preparación"];
-  const negativeStates = ["suspendido", "rechazada", "cancelada", "abandonado"];
+  const positiveStates = ["activo", "aprobada", "entregado", "completada", "resuelta", "delivered"];
+  const warningStates = ["procesando", "en camino", "pendiente", "en revisión", "preparación", "pending", "picked_up", "in_transit", "out_for_delivery"];
+  const negativeStates = ["suspendido", "rechazada", "cancelada", "abandonado", "failed", "cancelled"];
   
   const cleanVal = val.toLowerCase();
   

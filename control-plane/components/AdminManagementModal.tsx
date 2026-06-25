@@ -13,13 +13,13 @@ const mockDatabase: Record<string, any[]> = {
 };
 
 const DEFAULT_SCHEMAS: Record<string, Record<string, any>> = {
-  usuarios: { nombre: "", email: "", rol: "Cliente", estado: "Activo" },
+  usuarios: { nombre: "", email: "", rol: "BUYER", estado: "Activo" },
   productos: { titulo: "", autor: "", precio: 0, stock: 5 },
   ordenes: { cliente: "", total: 0, estado: "Pendiente" },
   carritos: { cliente: "", cantidadLibros: 1, totalEstimado: 0, estado: "Activo" },
   transacciones: { monto: 0, metodo: "MercadoPago", estado: "Pendiente" },
   disputas: { idOrden: "ORD-", motivo: "", estado: "Pendiente", severidad: "Baja", resolucion: "" },
-  envios: { idOrden: "ORD-", transportista: "Sin asignar", estado: "Preparación" }
+  envios: { idOrden: "ORD-", transportista: "Sin asignar", estado: "PENDING" }
 };
 
 interface AdminManagementModalProps {
@@ -234,7 +234,7 @@ export default function AdminManagementModal({
     setEditingItem(null);
     let initialForm: Record<string, any> = {};
     if (sectionId === 'usuarios') {
-      initialForm = { nombre: "", email: "", password: "", rol: "Cliente" };
+      initialForm = { nombre: "", lastName: "", email: "", password: "", rol: "BUYER" };
     } else {
       const schemaSource = records.length > 0
         ? records[0]
@@ -269,6 +269,7 @@ export default function AdminManagementModal({
           body: JSON.stringify({
             action: 'create',
             nombre: formData.nombre,
+            lastName: formData.lastName,
             email: formData.email,
             password: formData.password,
             rol: formData.rol

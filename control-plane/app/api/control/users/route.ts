@@ -40,11 +40,19 @@ export async function GET() {
       const email = user.emailAddresses[0]?.emailAddress || "Sin email";
 
       const roles = (user.publicMetadata?.roles || []) as string[];
-      let rol = "Cliente";
-      if (roles.some((r) => r.toUpperCase() === "ADMIN")) {
-        rol = "Administrador";
-      } else if (roles.some((r) => r.toUpperCase() === "MODERADOR" || r.toUpperCase() === "MODERATOR")) {
-        rol = "Moderador";
+      const expectedRoles = ["ADMIN", "CARRIER", "OPERATOR", "SELLER", "BUYER"];
+      let rol = "BUYER";
+      const foundRole = roles.find((r) => expectedRoles.includes(r.toUpperCase()));
+      if (foundRole) {
+        rol = foundRole.toUpperCase();
+      } else if (roles.some((r) => r.toLowerCase() === "moderador" || r.toLowerCase() === "moderator")) {
+        rol = "OPERATOR";
+      } else if (roles.some((r) => r.toLowerCase() === "admin")) {
+        rol = "ADMIN";
+      } else if (roles.some((r) => r.toLowerCase() === "cliente")) {
+        rol = "BUYER";
+      } else if (roles[0]) {
+        rol = roles[0].toUpperCase();
       }
 
       const estado = user.banned ? "Suspendido" : "Activo";
@@ -78,7 +86,7 @@ export async function POST(req: Request) {
   try {
     const client = await checkAdminAuthorization();
     const body = await req.json();
-    const { action, userId, nombre, email, password, rol } = body;
+    const { action, userId, nombre, lastName, email, password, rol } = body;
 
     if (!action) {
       return NextResponse.json({ success: false, error: "Falta parámetro 'action'" }, { status: 400 });
@@ -91,21 +99,16 @@ export async function POST(req: Request) {
 
       const nameParts = (nombre || "").trim().split(/\s+/);
       const firstName = nameParts[0] || "Usuario";
-      const lastName = nameParts.slice(1).join(" ") || undefined;
+      const userLastName = lastName || nameParts.slice(1).join(" ") || undefined;
 
       // Mapear rol a metadatos de Clerk
-      let clerkRole = "cliente";
-      if (rol === "Administrador") {
-        clerkRole = "admin";
-      } else if (rol === "Moderador") {
-        clerkRole = "moderador";
-      }
+      const clerkRole = (rol || "BUYER").toUpperCase();
 
       const newUser = await client.users.createUser({
         emailAddress: [email],
         password,
         firstName,
-        lastName,
+        lastName: userLastName,
         publicMetadata: {
           roles: [clerkRole],
         },

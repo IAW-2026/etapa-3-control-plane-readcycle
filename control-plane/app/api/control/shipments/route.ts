@@ -61,22 +61,11 @@ export async function GET() {
     const rawShipments = Array.isArray(data) ? data : (data?.data || []);
 
     const formattedShipments = rawShipments.map((s: any) => {
-      let estado = "Preparación";
-      if (s.currentStatus === "PICKED_UP") {
-        estado = "En Camino";
-      } else if (s.currentStatus === "DELIVERED") {
-        estado = "Entregado";
-      } else if (s.currentStatus === "CANCELLED") {
-        estado = "Cancelado";
-      } else if (s.currentStatus === "FAILED") {
-        estado = "Fallido";
-      }
-
       return {
         id: s.id,
         idOrden: s.orderId || "N/A",
         carrierId: s.carrierId || null,
-        estado: estado,
+        estado: s.currentStatus || "PENDING",
         fechaCreacion: s.createdAt || ""
       };
     });
@@ -118,16 +107,7 @@ export async function PUT(req: Request) {
       );
     }
 
-    let status = "PENDING";
-    if (estado === "En Camino") {
-      status = "PICKED_UP";
-    } else if (estado === "Entregado") {
-      status = "DELIVERED";
-    } else if (estado === "Cancelado") {
-      status = "CANCELLED";
-    } else if (estado === "Fallido") {
-      status = "FAILED";
-    }
+    const status = estado || "PENDING";
 
     let url = baseUrl;
     if (url.endsWith('/api/')) {
@@ -139,7 +119,7 @@ export async function PUT(req: Request) {
       url = `${cleanBase}/api/shipments/${id}`;
     }
 
-    console.log(`Sending PUT request to shipping service at: ${url} with status: ${status}, carrierId: ${carrierId}`);
+    console.log(`Sending PUT request to shipping service at: ${url} to update carrierId: ${carrierId}`);
 
     const response = await fetch(url, {
       method: "PUT",
@@ -149,7 +129,6 @@ export async function PUT(req: Request) {
         "Accept": "application/json",
       },
       body: JSON.stringify({
-        currentStatus: status,
         carrierId: carrierId || null,
       }),
       cache: "no-store",
@@ -165,6 +144,41 @@ export async function PUT(req: Request) {
     }
 
     const updatedData = await response.json();
+
+    // Actualizar el estado del envío vía POST a /api/shipments/${id}/tracking
+    if (estado) {
+      let trackingUrl = baseUrl;
+      if (trackingUrl.endsWith('/api/')) {
+        trackingUrl = `${trackingUrl}shipments/${id}/tracking`;
+      } else if (trackingUrl.endsWith('/api')) {
+        trackingUrl = `${trackingUrl}/shipments/${id}/tracking`;
+      } else {
+        const cleanBase = trackingUrl.endsWith('/') ? trackingUrl.slice(0, -1) : trackingUrl;
+        trackingUrl = `${cleanBase}/api/shipments/${id}/tracking`;
+      }
+
+      console.log(`Sending POST request to tracking at: ${trackingUrl} with description: ${status}`);
+
+      const trackingResponse = await fetch(trackingUrl, {
+        method: "POST",
+        headers: {
+          "X-API-Key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          description: status,
+        }),
+      });
+
+      if (!trackingResponse.ok) {
+        const errorText = await trackingResponse.text();
+        console.error(`Error updating shipment tracking on external API (status ${trackingResponse.status}):`, errorText);
+        return NextResponse.json(
+          { success: false, error: `Envío modificado pero falló actualizar estado: ${trackingResponse.status} ${trackingResponse.statusText}` },
+          { status: trackingResponse.status }
+        );
+      }
+    }
 
     return NextResponse.json({
       success: true,
